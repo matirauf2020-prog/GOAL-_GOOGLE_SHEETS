@@ -21,6 +21,10 @@
   let error = '';
   let conflict = false;
   let busy = false;
+  // Startup gate state: do not open the workspace until the remembered cloud copy has been checked.
+  let startupCheckComplete = false;
+  let startupNeedsSetup = false;
+  let restoredFromCloud = false;
   // Short-lived Google access tokens are scoped to this browser tab's session,
   // NEVER localStorage or GitHub files. sessionStorage survives a normal refresh.
   const restoredSession = (() => {
@@ -49,7 +53,16 @@
   // Send this URL to another device you own. The Sheet itself remains access-controlled by Google.
   function shareUrl() {
     if (!sheetId || typeof location === 'undefined') return '';
-    return location.origin + location.pathname + '#' + SHEET_LINK_KEY + '=' + encodeURIComponent(sheetId);
+    return location.origin + location.pathname + location.search + '#' + SHEET_LINK_KEY + '=' + encodeURIComponent(sheetId);
+  }
+  // Keep the non-secret Sheet ID in the page URL as a recovery pointer. Google still protects the Sheet.
+  // Bookmarking this private workspace URL lets the app find the Sheet again if browser storage is cleared.
+  function rememberSheetInUrl() {
+    if (!sheetId || typeof history === 'undefined' || !history.replaceState || typeof location === 'undefined') return;
+    try {
+      const hash = SHEET_LINK_KEY + '=' + encodeURIComponent(sheetId);
+      if (location.hash.replace(/^#/, '') !== hash) history.replaceState(null, '', location.pathname + location.search + '#' + hash);
+    } catch (_) {}
   }
   function extractId(value) {
     const text=String(value||'').trim();
@@ -153,25 +166,38 @@
   function linked(newId) {
     if(newId!==sheetId){sheetId=newId;syncedRevision='';syncedHash='';syncedAt='';pending=Boolean(jsonData());}
     manuallyDisconnected=false;
-    conflict=false;error='';persistConnection();renderStatus();
+    startupCheckComplete=false;startupNeedsSetup=false;restoredFromCloud=false;
+    conflict=false;error='';persistConnection();rememberSheetInUrl();renderStatus();
   }
   async function checkConnectedSheet() {
-    if(!sheetId) {status='Connected. Create a new private Sheet or paste an existing GoalOS Sheet URL.';renderStatus();return;}
-    status='Checking your Google Sheet…';renderStatus();
+    startupCheckComplete=false;startupNeedsSetup=false;restoredFromCloud=false;
+    if(!sheetId) {
+      startupNeedsSetup=true;startupCheckComplete=true;
+      status='Google connected. Create a private Sheet or paste the link to your existing GoalOS Sheet.';
+      renderStatus();return;
+    }
+    status='Checking your Google Sheet and restoring your saved workspace if needed…';renderStatus();
     await ensureSheets();
     const header=await getHeader();
     const local=jsonData();
     const localHash=local?hashString(local):'';
     if(!header.active){
       conflict=false;
-      status='The Sheet is ready.';
-      renderStatus();
-      if(local){await saveNow();}
+      if(local){
+        status='Your Sheet is ready. Saving this browser workspace to Google Sheets…';renderStatus();
+        await saveNow();
+        if(!error){startupNeedsSetup=false;startupCheckComplete=true;}
+      } else {
+        startupNeedsSetup=true;startupCheckComplete=true;
+        status='The linked Sheet is empty. Import your backup or create a workspace in Settings.';
+        renderStatus();
+      }
       return;
     }
     if(!local){ await loadNow(false); return; }
     if(syncedRevision===header.revision && syncedHash===localHash){
-      pending=false;error='';conflict=false;status='All changes are saved to Google Sheets.';
+      pending=false;error='';conflict=false;startupNeedsSetup=false;startupCheckComplete=true;
+      status='All changes are saved to Google Sheets.';
       persistConnection();renderStatus();return;
     }
     if(syncedRevision===header.revision && (pending || syncedHash!==localHash)){
@@ -179,8 +205,14 @@
     }
     if(syncedRevision && syncedHash===localHash){await loadNow(false);return;}
     const remote=await loadRemote(header);
-    if(remote.hash===localHash){syncedRevision=remote.revision;syncedHash=remote.hash;pending=false;conflict=false;error='';syncedAt=remote.revision.slice(0,24)||new Date().toISOString();status='Your browser and Google Sheet match.';persistConnection();renderStatus();return;}
-    conflict=true;pending=true;status='Both this browser and the Google Sheet contain data. Choose Load from Sheet or Save this browser manually. Nothing has been overwritten.';
+    if(remote.hash===localHash){
+      syncedRevision=remote.revision;syncedHash=remote.hash;pending=false;conflict=false;error='';
+      syncedAt=remote.revision.slice(0,24)||new Date().toISOString();
+      startupNeedsSetup=false;startupCheckComplete=true;
+      status='Your browser and Google Sheet match.';persistConnection();renderStatus();return;
+    }
+    conflict=true;pending=true;startupNeedsSetup=true;startupCheckComplete=true;
+    status='Both this browser and the Google Sheet contain different data. Review the conflict before continuing. Nothing has been overwritten.';
     renderStatus();
   }
   async function saveNow(force=false) {
@@ -219,10 +251,11 @@
       const current=jsonData();
       pending=current!==raw;
       conflict=false;error='';status=pending?'Saved one version; uploading newer changes…':'All changes saved to your private Google Sheet.';
+      if(!pending){startupCheckComplete=true;startupNeedsSetup=false;}
       persistConnection();
       if(!pending)alertUser('Saved successfully to Google Sheets.');
     } catch(e) {
-      error=e.message;pending=true;status='Save failed: '+e.message;
+      error=e.message;pending=true;startupCheckComplete=true;startupNeedsSetup=true;status='Save failed: '+e.message;
       persistConnection();alertUser(status);
     } finally {
       busy=false;renderStatus();
@@ -240,9 +273,10 @@
       if(confirmOverwrite && jsonData() && hashString(jsonData())!==remote.hash && !window.confirm('Replace this browser’s goals, transactions, loans and settings with the Google Sheet copy? Export local JSON first if needed.'))return;
       helpers.restoreData(remote.data); // This bypasses cloud autosave to prevent replacing the just-loaded data.
       syncedRevision=remote.revision;syncedHash=remote.hash;syncedAt=remote.revision.slice(0,24)||new Date().toISOString();
-      pending=false;conflict=false;error='';status='Loaded from Sheets. All your data is available.';
+      pending=false;conflict=false;error='';restoredFromCloud=true;startupCheckComplete=true;startupNeedsSetup=false;status='Loaded from Sheets. All your data is available.';
       persistConnection();alertUser('Full workspace loaded from Google Sheets.');
-    } catch(e){error=e.message;status='Load failed: '+e.message;alertUser(status);}
+      helpers?.onWorkspaceReady?.();
+    } catch(e){error=e.message;startupCheckComplete=true;startupNeedsSetup=true;status='Load failed: '+e.message;alertUser(status);}
     finally {busy=false;renderStatus();}
   }
   function scheduleSave(){clearTimeout(timer);timer=setTimeout(()=>{ if(connected()&&sheetId&&!conflict)saveNow(); },1300);}
@@ -261,10 +295,10 @@
         if(!result?.access_token || result.error){alertUser('Google did not authorize the Sheets connection.');return;}
         if(!String(result.scope||'').split(' ').includes(SCOPE)){alertUser('Sheets permission was not granted.');return;}
         token=result.access_token;expiresAt=Date.now()+(Math.max(60,Number(result.expires_in)||3600)*1000);
-        manuallyDisconnected=false;
+        manuallyDisconnected=false;startupCheckComplete=false;startupNeedsSetup=false;restoredFromCloud=false;
         persistSession();persistConnection();
         status='Google access resumed. Syncing your remembered Sheet…';error='';renderStatus();
-        try{await checkConnectedSheet();}catch(e){error=e.message;status='Cannot access Sheet: '+e.message;renderStatus();alertUser(status);}
+        try{await checkConnectedSheet();}catch(e){error=e.message;startupCheckComplete=true;startupNeedsSetup=true;status='Cannot access Sheet: '+e.message;renderStatus();alertUser(status);}
       },error_callback:()=>alertUser('Google popup was blocked or closed. Please try again.')});
     }
     tokenClient.requestAccessToken({prompt:''}); // Consent is shown by Google only when needed.
@@ -279,11 +313,13 @@
       ]});
       if(!created.spreadsheetId)throw Error('Google did not return a new spreadsheet ID.');
       linked(created.spreadsheetId);
+      startupCheckComplete=true;startupNeedsSetup=!Boolean(jsonData());
       status='Private Sheet created: '+created.spreadsheetId;
       alertUser('Google Sheet created successfully.');
     }catch(e){error=e.message;status='Sheet creation failed: '+e.message;alertUser(status);}
     finally{busy=false;renderStatus();}
     if(sheetId && connected() && jsonData())await saveNow();
+    if(startupCheckComplete && !startupNeedsSetup && !conflict && !error)helpers?.onWorkspaceReady?.();
   }
   async function useExisting(){
     if(!connected()){alertUser('Connect Google first.');return;}
@@ -291,7 +327,7 @@
     if(!newId){alertUser('Paste a valid Google Sheets URL or spreadsheet ID.');return;}
     if(sheetId && sheetId!==newId && !window.confirm('Switch GoalOS to this different Google Sheet? Unsaved local data will not be deleted.'))return;
     linked(newId);
-    try{await checkConnectedSheet();}catch(e){error=e.message;status='Cannot open that Google Sheet: '+e.message;renderStatus();alertUser(status);}
+    try{await checkConnectedSheet();if(startupCheckComplete&&!startupNeedsSetup&&!conflict&&!error)helpers?.onWorkspaceReady?.();}catch(e){error=e.message;startupCheckComplete=true;startupNeedsSetup=true;status='Cannot open that Google Sheet: '+e.message;renderStatus();alertUser(status);}
   }
   async function handle(action){
     if(action==='connect-sheets')return connect();
@@ -302,7 +338,7 @@
     if(action==='disconnect-sheets'){
       clearTimeout(timer);
       token='';expiresAt=0;error='';conflict=false;
-      manuallyDisconnected=true;persistSession();persistConnection();
+      manuallyDisconnected=true;startupCheckComplete=true;startupNeedsSetup=true;persistSession();persistConnection();
       status='Disconnected by you. Your Google Sheet and data were not deleted. Auto-resume is off until you connect again.';
       renderStatus();alertUser('Disconnected on this device. Your private Google Sheet is unchanged.');
     }
@@ -340,11 +376,15 @@
   }
   window.GoalOSSheets={init(api){
     helpers=api;
-    persistSession();renderStatus();
-    // A normal reload can resume automatically while its SESSION token remains valid.
-    // No new OAuth popups are opened without the user's click.
-    if(connected() && sheetId)checkConnectedSheet().catch(e=>{
-      error=e.message;status='Cannot resume Sheet sync: '+e.message;renderStatus();
-    });
-  },changed,handle,html,getStatus:()=>({sheetId,connected:connected(),pending,conflict,error,syncedRevision,syncedAt,manuallyDisconnected,shareUrl:shareUrl()}),_testing:{hashString,chunks,viewData,extractId}};
+    persistSession();
+    if(sheetId)rememberSheetInUrl();
+    if(connected() && sheetId){
+      startupCheckComplete=false;renderStatus();
+      checkConnectedSheet().catch(e=>{
+        error=e.message;startupCheckComplete=true;startupNeedsSetup=true;status='Cannot resume Sheet sync: '+e.message;renderStatus();
+      });
+    } else {
+      startupCheckComplete=true;startupNeedsSetup=!sheetId;renderStatus();
+    }
+  },changed,handle,html,restoreFromCloud:()=>loadNow(false),getStatus:()=>({sheetId,connected:connected(),pending,conflict,error,status,startupCheckComplete,startupNeedsSetup,restoredFromCloud,hasLocalData:Boolean(jsonData()),syncedRevision,syncedAt,manuallyDisconnected,shareUrl:shareUrl()}),_testing:{hashString,chunks,viewData,extractId}};
 })();

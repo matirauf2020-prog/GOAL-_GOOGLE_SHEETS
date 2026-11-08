@@ -103,3 +103,26 @@ This also recovers your records after browser cache deletion: use the Sheet URL 
 6. The **Disconnect this device** button intentionally clears this tab's authorization and prevents automatic resume until you connect again. Your cloud data stays in the Sheet.
 
 **Google OAuth limits:** Google's browser token model requires a user action for a new access token and does not support silent background token refresh. Even this updated site cannot promise to keep the Google account authorized for weeks or after token expiry. The Sheet association, local unsaved data, and URL handoff persist; access may require a one-click Google authorization. Never paste your OAuth client secret into public website files. If a client secret has appeared in a shared screenshot or chat, rotate it in Google Cloud Console.
+
+## Startup screen and automatic cloud restore (November 2026 update)
+
+GoalOS now shows the welcome / Google connection screen before the dashboard on every fresh page load.
+
+- If a valid Google session and a linked Sheet are available, GoalOS checks the cloud copy first. If this browser has no local workspace data, it restores the complete saved snapshot from the private Sheet, then opens the dashboard.
+- If Google authorization has expired, the welcome screen asks you to reconnect. After authorization, GoalOS checks and restores the remembered Sheet before opening the dashboard.
+- If local and cloud records differ, GoalOS stops and asks you to review the conflict. It does not silently overwrite either copy.
+- If the Sheet is empty or no Sheet is linked, the welcome screen sends you to Settings & Google Sheets to select/create the correct spreadsheet.
+
+### Recovery after deleting local GoalOS data
+
+Use **Settings → Clear local cache** only when you intend to remove this browser's copy. The linked Google Sheet is not deleted. If the connection settings remain, reconnect Google and GoalOS will automatically load the cloud snapshot.
+
+When a Sheet is first created or linked, GoalOS also adds its non-secret spreadsheet ID to the current page URL as `#goalos-sheet=...`. Bookmark that private workspace URL. If the browser's entire site storage is later cleared (including the saved Sheet ID), reopen the bookmarked URL, reconnect Google, and GoalOS can find the Sheet again. The spreadsheet ID is not an access token; the Sheet must still be shared only with your Google account. If you do not have the bookmarked URL, paste the private Google Sheet URL into Settings after connecting.
+
+### What is and is not automatic
+
+- A normal refresh keeps a still-valid access token in the current tab and keeps the remembered Sheet ID.
+- Google access tokens expire. GoalOS cannot bypass Google's authorization rules; it may ask you to reconnect.
+- A new browser/device needs Google authorization. Open the bookmarked private workspace URL or use **Copy link for another device**.
+- GoalOS uses the Google Sheets API only. It does not use the Google Drive API, Gmail, reminders, or Apps Script.
+- Google Sheets is the cloud copy, but it is not an absolute guarantee against deletion of the spreadsheet or loss of the Google account. Keep the spreadsheet sharing restricted and occasionally export a private JSON backup.

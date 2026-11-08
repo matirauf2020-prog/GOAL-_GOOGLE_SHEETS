@@ -8,17 +8,21 @@
   <title>GoalOS — Your 2026 Command Center</title>
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20261108-cloudrestore-v2" />
+  <script>document.documentElement.classList.add('goalos-startup-pending');</script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- Backup public client ID prevents stale or missing site-config.js from blocking sign-in. -->
   <script>window.GOALOS_GOOGLE_CLIENT_ID = '742709884845-i6ikkp6eni62vdvtqb00upra29kj3n0a.apps.googleusercontent.com';</script>
-  <script src="site-config.js?v=20261108-stayconnected-v1" defer></script>
-  <script src="sheet-sync.js?v=20261108-stayconnected-v1" defer></script>
-  <script src="app.js?v=20261108-stayconnected-v1" defer></script>
+  <script src="site-config.js?v=20261108-cloudrestore-v2" defer></script>
+  <script src="sheet-sync.js?v=20261108-cloudrestore-v2" defer></script>
+  <script src="app.js?v=20261108-cloudrestore-v2" defer></script>
 
   <style>
     /* GoalOS startup welcome / Google connection gate — self-contained in index.html */
+    html.go-startup-pending .app-shell { visibility: hidden; }
     body.go-startup-open { overflow: hidden; }
+    .go-startup[hidden] { display: none !important; }
+    #goStartup { display: grid; z-index: 99999; }
     .go-startup { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; overflow: auto; padding: 28px; color: #f8f9ff; background: radial-gradient(ellipse at 18% 16%, rgba(112,91,255,.34), transparent 36%), radial-gradient(ellipse at 88% 82%, rgba(34,191,174,.18), transparent 34%), linear-gradient(135deg,#091225 0%,#111c36 48%,#1b1740 100%); opacity: 1; visibility: visible; transition: opacity .42s ease, visibility .42s ease; }
     .go-startup::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px); background-size: 54px 54px; mask-image: linear-gradient(to bottom,black,transparent 92%); }
     .go-startup.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -145,9 +149,7 @@
   <input type="file" id="privateImport" accept=".json,application/json" hidden />
 
   <script>
-    function startGoalOSStartupGate() {
-    // Startup gate: always show the welcome screen, then choose the correct action from the saved Sheets state.
-    (function () {
+    (function startGoalOSStartupGate() {
       const gate = document.getElementById('goStartup');
       const statePill = document.getElementById('goStartupState');
       const stateText = document.getElementById('goStartupStateText');
@@ -155,88 +157,140 @@
       const actionText = document.getElementById('goStartupActionText');
       const note = document.getElementById('goStartupNote');
       if (!gate || !action) return;
+
       document.body.classList.add('go-startup-open');
       let mode = 'connect';
       let busy = false;
+      let busySince = 0;
+      let closed = false;
+      let autoOpenTimer = null;
+      let pollTimer = null;
+
       function closeGate(goSettings) {
+        if (closed) return;
+        closed = true;
+        if (autoOpenTimer) clearTimeout(autoOpenTimer);
+        if (pollTimer) clearInterval(pollTimer);
         gate.classList.add('is-hidden');
         document.body.classList.remove('go-startup-open');
+        document.documentElement.classList.remove('goalos-startup-pending');
         setTimeout(() => { gate.hidden = true; }, 450);
-        if (goSettings) {
+        if (goSettings) setTimeout(() => {
           const settings = document.querySelector('.nav-item[data-page="settings"]');
           if (settings) settings.click();
-        }
+        }, 80);
       }
+
       function paint() {
+        if (closed) return;
         const api = window.GoalOSSheets;
         const s = api && typeof api.getStatus === 'function' ? api.getStatus() : null;
-        const ready = !!(s && s.connected && s.sheetId);
-        const signedIn = !!(s && s.connected);
-        statePill.classList.toggle('is-connected', signedIn);
-        if (busy) {
-          stateText.textContent = 'Waiting for Google…';
-          actionText.textContent = 'Connecting…';
+        if (!s) {
+          statePill.classList.remove('is-connected');
+          stateText.textContent = 'Preparing your private workspace…';
+          actionText.textContent = 'Please wait';
           action.disabled = true;
-          mode = 'busy';
+          mode = 'waiting';
           return;
         }
+
+        if (busy && s.connected && (s.startupCheckComplete || !s.sheetId)) busy = false;
+        if (busy && Date.now() - busySince > 120000) busy = false;
+
+        const signedIn = !!s.connected;
+        const hasSheet = !!s.sheetId;
+        const checked = !!s.startupCheckComplete;
+        statePill.classList.toggle('is-connected', signedIn);
         action.disabled = false;
-        if (ready) {
-          stateText.textContent = 'Google connected · private Sheet linked';
-          actionText.textContent = 'Open my GoalOS workspace';
-          note.textContent = 'Your saved Google Sheet is linked. Open your workspace and continue where you left off.';
-          mode = 'open';
-        } else if (signedIn) {
-          stateText.textContent = 'Google connected · finish Sheet setup';
-          actionText.textContent = 'Continue to Google Sheets setup';
-          note.textContent = 'You are signed in. Create a private GoalOS spreadsheet or select the one you already use.';
-          mode = 'setup';
-        } else if (s && s.sheetId) {
-          stateText.textContent = 'Your Google Sheet is remembered · sign-in needed';
-          actionText.textContent = 'Reconnect Google';
-          note.textContent = 'Your spreadsheet selection is remembered. Sign in again to safely resume syncing.';
-          mode = 'connect';
-        } else {
-          stateText.textContent = 'Not connected to Google';
-          actionText.textContent = 'Connect Google to continue';
-          note.textContent = 'Connect your Google account to open your private workspace. Your spreadsheet stays in your Google account.';
-          mode = 'connect';
+
+        if (busy) {
+          stateText.textContent = 'Connecting to Google and checking your saved data…';
+          actionText.textContent = 'Connecting…';
+          action.disabled = true;
+          mode = 'waiting';
+          return;
         }
+        if (signedIn && hasSheet && !checked) {
+          stateText.textContent = 'Google connected · checking your saved Sheet…';
+          actionText.textContent = 'Restoring workspace…';
+          action.disabled = true;
+          note.textContent = 'GoalOS is checking your private spreadsheet. If this browser has no local copy, your saved cloud workspace will be restored before opening.';
+          mode = 'waiting';
+          return;
+        }
+        if (signedIn && hasSheet && checked && s.conflict) {
+          stateText.textContent = 'Google connected · data needs review';
+          actionText.textContent = 'Review Google Sheets';
+          note.textContent = 'Your browser and cloud copies differ. Nothing has been overwritten. Review the two copies before continuing.';
+          mode = 'review';
+          return;
+        }
+        if (signedIn && hasSheet && checked && s.error) {
+          stateText.textContent = 'Google connected · could not verify saved data';
+          actionText.textContent = 'Review Google Sheets';
+          note.textContent = s.error + ' Your local records have not been intentionally replaced.';
+          mode = 'review';
+          return;
+        }
+        if (signedIn && hasSheet && checked && s.startupNeedsSetup) {
+          stateText.textContent = 'Google connected · finish workspace setup';
+          actionText.textContent = 'Continue to Google Sheets setup';
+          note.textContent = s.status || 'The selected spreadsheet is empty or needs setup. Select the correct Sheet or import your private backup.';
+          mode = 'setup';
+          return;
+        }
+        if (signedIn && hasSheet && checked) {
+          stateText.textContent = s.restoredFromCloud ? 'Your workspace has been restored from Google Sheets' : 'Google connected · private workspace ready';
+          actionText.textContent = 'Open my GoalOS workspace';
+          note.textContent = 'Your saved transactions, goals, loans, settings and workbook archive are ready. Opening your workspace…';
+          mode = 'open';
+          if (!autoOpenTimer) autoOpenTimer = setTimeout(() => closeGate(false), 900);
+          return;
+        }
+        if (signedIn && !hasSheet) {
+          stateText.textContent = 'Google connected · no spreadsheet selected';
+          actionText.textContent = 'Continue to Google Sheets setup';
+          note.textContent = 'Choose your existing private GoalOS spreadsheet or create one. After it is linked, GoalOS will load your saved records.';
+          mode = 'setup';
+          return;
+        }
+
+        stateText.textContent = hasSheet ? 'Your private Sheet is remembered · sign-in needed' : 'Not connected to Google';
+        actionText.textContent = hasSheet ? 'Reconnect Google to restore workspace' : 'Connect Google to continue';
+        note.textContent = hasSheet
+          ? 'Your spreadsheet selection is remembered. Reconnect with the Google account that owns or can access it. GoalOS will check the cloud copy before opening.'
+          : 'Connect your Google account to open your private workspace. Your spreadsheet stays private in your Google account.';
+        mode = 'connect';
       }
+
       action.addEventListener('click', function () {
         if (mode === 'open') { closeGate(false); return; }
-        if (mode === 'setup') { closeGate(true); return; }
-        if (mode === 'connect') {
-          if (!window.GoalOSSheets || typeof window.GoalOSSheets.handle !== 'function' || !window.google?.accounts?.oauth2) {
-            stateText.textContent = 'Google sign-in is still loading. Wait a moment, then try again.';
-            note.textContent = 'The Google sign-in service is loading. Your workspace is safe; please try the button again shortly.';
-            return;
-          }
-          busy = true; paint();
-          try { window.GoalOSSheets.handle('connect-sheets'); }
-          catch (_) { busy = false; stateText.textContent = 'Could not start Google sign-in. Please try again.'; paint(); }
-          // The Google popup is user-initiated. Poll only the local connection state; never auto-open a popup.
-          const started = Date.now();
-          const wait = setInterval(function () {
-            const s = window.GoalOSSheets?.getStatus?.();
-            if (s && s.connected) { clearInterval(wait); busy = false; paint(); }
-            else if (Date.now() - started > 45000) { clearInterval(wait); busy = false; paint(); stateText.textContent = 'Sign-in not completed. Please try again.'; }
-          }, 350);
+        if (mode === 'setup' || mode === 'review') { closeGate(true); return; }
+        if (mode !== 'connect') return;
+        const api = window.GoalOSSheets;
+        if (!api || typeof api.handle !== 'function') {
+          stateText.textContent = 'Google connection is still loading. Please try again.';
+          return;
+        }
+        busy = true;
+        busySince = Date.now();
+        paint();
+        try {
+          const result = api.handle('connect-sheets');
+          if (result && typeof result.catch === 'function') result.catch(() => { busy = false; paint(); });
+        } catch (_) {
+          busy = false;
+          stateText.textContent = 'Could not start Google sign-in. Please try again.';
+          paint();
         }
       });
+
       paint();
-      // Refresh the welcome screen as the existing Sheets module restores its session on page load.
-      let ticks = 0;
-      const poll = setInterval(function () {
-        paint();
-        ticks += 1;
-        if (ticks > 80) clearInterval(poll);
-      }, 250);
+      // Keep the welcome screen in front until Google has checked/restored the cloud workspace.
+      pollTimer = setInterval(paint, 300);
       window.addEventListener('pageshow', paint);
+      window.addEventListener('goalos:sheets-status', paint);
     })();
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startGoalOSStartupGate, { once: true });
-    else startGoalOSStartupGate();
   </script>
 
 </body>

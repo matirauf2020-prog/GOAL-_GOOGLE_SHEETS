@@ -1,13 +1,19 @@
-GoalOS 2026 — Stay Connected to Google Sheets
+GOALOS — GOOGLE SHEETS CLOUD RESTORE EDITION
 
-1. Extract the ZIP.
-2. Upload ALL extracted files to the ROOT of your existing GitHub Pages repository.
-3. Wait for Pages deployment, then Ctrl + Shift + R on the live site.
-4. Open GoalOS Settings → Resume/Connect Google Sheets, then link your EXISTING Sheet if needed. DO NOT create another Sheet when you already have data in one.
-5. Check the status Saved to Sheets, then refresh the same tab to test persistence.
-6. To use a different phone or PC, choose Copy link for another device and authorize Google there once.
-7. Disconnect this device only when you choose.
+1. Extract all files in this folder into the ROOT of your GitHub Pages repository.
+2. Commit and wait for GitHub Pages to deploy.
+3. Open your GitHub Pages website and press Ctrl+Shift+R once.
+4. The GoalOS welcome screen appears before the dashboard.
+5. Connect Google. If a Sheet is already linked, GoalOS checks it and restores the cloud workspace if the local copy is missing.
+6. If no Sheet is linked, go to Settings & Google Sheets and create/select your private Sheet.
+7. Bookmark the URL after linking. It includes a non-secret Sheet ID recovery pointer.
 
-Google's short-lived OAuth tokens cannot stay valid forever on a static website. If one expires, use Resume Google Sheets. No Google Drive backup, no Gmail reminders.
+Important:
+- Keep your Google Sheet sharing set to Restricted.
+- Only the OAuth Web Client ID belongs in site-config.js / the public page. Never upload a client secret or OAuth JSON file.
+- No Google Drive API, Gmail, reminders, or Apps Script are used.
+- If local/cloud data differ, GoalOS stops and asks you to resolve the conflict.
+- A Google access token can expire; Google may require you to reconnect.
+- Never upload your private JSON backup or Excel workbook to a public GitHub repository.
 
-More info: UPDATE_THIS_TIME.txt or SETUP_SHEETS.md
+See SETUP_SHEETS.md for the complete Google Cloud and recovery instructions.

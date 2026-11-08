@@ -1,14 +1,15 @@
-GOALOS FIX — KEEP SHEETS CONNECTED ON REFRESH
+GOALOS STARTUP + GOOGLE SHEETS RESTORE UPDATE
 
-1. Extract GoalOS_Sheets_Stay_Connected.zip.
-2. On GitHub, upload all extracted files into your existing repository root (replace files).
-3. Visit your GitHub Pages URL and press Ctrl+Shift+R.
-4. Settings & Google Sheets > Resume / Connect Google. If your existing Sheet is missing, paste your existing Sheet URL and choose Use this Sheet. Do not create a new one.
-5. Save all data to Sheet; confirm Saved to Sheets.
-6. REFRESH the same tab: while the short-lived token is valid it now stays authorized and automatically checks your Sheet.
-7. Other device: Settings > Copy link for another device; open there and authorize Google once. It will load the same private Sheet when the account has access.
-8. Disconnect this device only when you want to stop auto-resume.
+This is a full website update. Replace the existing website files in the GitHub Pages repository root with the files from this package.
 
-NOTE: Google does not allow a GitHub Pages-only browser app to remain authorized forever with no user action. When Google's access token expires or after a browser session ends, use Resume Google Sheets. Data in the Sheet remains stored; a token expiring does not delete data.
+Main changes:
+- Startup welcome screen is always shown before the dashboard.
+- Existing Google session + linked Sheet are checked before opening.
+- Missing local workspace data is restored from the linked Google Sheet.
+- After a successful restore, GoalOS automatically opens the main workspace.
+- Local/cloud conflicts stop for review instead of silently overwriting data.
+- The linked Sheet ID is written to the page URL fragment as a recovery pointer. Bookmark that URL.
+- Clear local cache preserves the Google Sheet and immediately restores it when currently authorized.
+- Service-worker cache version is updated to prevent old app files from being reused.
 
-Do not upload private JSON or Google OAuth client secret to GitHub. If secret exposed, reset it in Google Cloud Console.
+Do not upload private Excel or JSON data to a public repository. Do not upload the OAuth client secret.
