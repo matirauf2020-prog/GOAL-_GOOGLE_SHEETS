@@ -15,6 +15,53 @@
   <script src="site-config.js?v=20261108-stayconnected-v1" defer></script>
   <script src="sheet-sync.js?v=20261108-stayconnected-v1" defer></script>
   <script src="app.js?v=20261108-stayconnected-v1" defer></script>
+
+  <style>
+    /* GoalOS startup welcome / Google connection gate — self-contained in index.html */
+    body.go-startup-open { overflow: hidden; }
+    .go-startup { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; overflow: auto; padding: 28px; color: #f8f9ff; background: radial-gradient(ellipse at 18% 16%, rgba(112,91,255,.34), transparent 36%), radial-gradient(ellipse at 88% 82%, rgba(34,191,174,.18), transparent 34%), linear-gradient(135deg,#091225 0%,#111c36 48%,#1b1740 100%); opacity: 1; visibility: visible; transition: opacity .42s ease, visibility .42s ease; }
+    .go-startup::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px); background-size: 54px 54px; mask-image: linear-gradient(to bottom,black,transparent 92%); }
+    .go-startup.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    .go-startup-card { position: relative; width: min(100%,1080px); min-height: min(680px,calc(100vh - 56px)); display: grid; grid-template-columns: 1.08fr .92fr; overflow: hidden; border: 1px solid rgba(255,255,255,.15); border-radius: 30px; background: rgba(13,23,46,.72); box-shadow: 0 32px 100px rgba(0,0,0,.38); backdrop-filter: blur(22px); }
+    .go-startup-copy { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(30px,6vw,72px); }
+    .go-startup-brand { display:flex; align-items:center; gap:12px; margin-bottom: clamp(42px,7vh,78px); }
+    .go-startup-mark { width:48px; height:48px; display:grid; place-items:center; border-radius:15px; color:white; font-size:25px; background:linear-gradient(140deg,#8977ff,#5746d8); box-shadow:0 10px 30px rgba(107,86,245,.38); }
+    .go-startup-brandname { font:800 22px/1 'Outfit',Inter,system-ui,sans-serif; letter-spacing:-.8px; }
+    .go-startup-brandname span { color:#a99cff; }
+    .go-startup-eyebrow { color:#b5abff; font:800 10px/1.4 Inter,system-ui,sans-serif; letter-spacing:2.2px; text-transform:uppercase; }
+    .go-startup h1 { max-width:540px; margin:15px 0 16px; color:#fff; font:800 clamp(39px,5vw,64px)/1.04 'Outfit',Inter,system-ui,sans-serif; letter-spacing:-2.7px; }
+    .go-startup-lead { max-width:470px; margin:0; color:#bdc8df; font:400 14px/1.85 Inter,system-ui,sans-serif; }
+    .go-startup-state { display:flex; align-items:center; gap:10px; margin:30px 0 18px; padding:10px 14px; border:1px solid rgba(255,255,255,.13); border-radius:999px; background:rgba(255,255,255,.06); color:#e8eaff; font:700 12px Inter,system-ui,sans-serif; }
+    .go-startup-dot { width:9px; height:9px; flex:0 0 9px; border-radius:50%; background:#f5b84d; box-shadow:0 0 0 5px rgba(245,184,77,.13); }
+    .go-startup-state.is-connected .go-startup-dot { background:#37d9a5; box-shadow:0 0 0 5px rgba(55,217,165,.13); }
+    .go-startup-btn { min-height:52px; min-width:220px; display:inline-flex; justify-content:center; align-items:center; gap:11px; border:0; border-radius:14px; padding:0 23px; cursor:pointer; color:#fff; background:linear-gradient(110deg,#7967ff,#5c4be2); box-shadow:0 12px 30px rgba(102,82,238,.32); font:800 13px Inter,system-ui,sans-serif; transition:transform .2s ease,filter .2s ease,box-shadow .2s ease; }
+    .go-startup-btn:hover { transform:translateY(-2px); filter:brightness(1.08); box-shadow:0 16px 36px rgba(102,82,238,.42); }
+    .go-startup-btn:focus-visible { outline:3px solid #c8c0ff; outline-offset:4px; }
+    .go-startup-btn:disabled { opacity:.7; cursor:wait; transform:none; }
+    .go-startup-note { max-width:410px; margin:14px 0 0; color:#8796b5; font:400 10px/1.7 Inter,system-ui,sans-serif; }
+    .go-startup-note strong { color:#cbd3e7; }
+    .go-startup-art { position:relative; display:grid; place-items:center; padding:38px; overflow:hidden; background:radial-gradient(circle at 50% 48%,rgba(124,103,255,.2),transparent 56%),linear-gradient(155deg,rgba(102,88,226,.18),rgba(27,192,173,.07)); }
+    .go-startup-orbit { position:absolute; width:min(35vw,390px); aspect-ratio:1; border:1px solid rgba(190,184,255,.22); border-radius:50%; box-shadow:0 0 0 34px rgba(190,184,255,.035),0 0 0 70px rgba(190,184,255,.025); animation:go-orbit 28s linear infinite; }
+    .go-startup-orbit::before,.go-startup-orbit::after { content:''; position:absolute; border-radius:50%; background:#a99aff; box-shadow:0 0 24px #9886ff; }
+    .go-startup-orbit::before { width:9px;height:9px;top:13%;left:16%; }
+    .go-startup-orbit::after { width:6px;height:6px;right:9%;bottom:24%;background:#48ddc1;box-shadow:0 0 20px #48ddc1; }
+    .go-startup-dashboard { position:relative; width:min(100%,365px); padding:23px; border:1px solid rgba(255,255,255,.2); border-radius:22px; background:linear-gradient(145deg,rgba(255,255,255,.15),rgba(255,255,255,.055)); box-shadow:0 30px 70px rgba(0,0,0,.25); backdrop-filter:blur(16px); transform:rotate(-3deg); animation:go-float 6s ease-in-out infinite; }
+    .go-startup-dash-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:24px; color:#f5f4ff; font:700 12px Inter,system-ui,sans-serif; }
+    .go-startup-mini-dot { width:7px;height:7px;display:inline-block;border-radius:50%;background:#45d9b1;margin-right:6px; }
+    .go-startup-stat { padding:16px; border:1px solid rgba(255,255,255,.12); border-radius:15px; background:rgba(10,18,39,.24); }
+    .go-startup-stat small { display:block; color:#aeb8d1; font:600 10px Inter,system-ui,sans-serif; }
+    .go-startup-stat strong { display:block; margin-top:7px; color:white; font:800 29px 'Outfit',Inter,system-ui,sans-serif; letter-spacing:-1px; }
+    .go-startup-bars { display:grid; gap:10px; margin-top:16px; }
+    .go-startup-bar { height:8px; overflow:hidden; border-radius:20px; background:rgba(255,255,255,.11); }
+    .go-startup-bar span { display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#8e7aff,#48d9bd); }
+    .go-startup-row { display:flex;justify-content:space-between;gap:10px;margin-top:17px;color:#dfe4f4;font:600 10px Inter,system-ui,sans-serif; }
+    .go-startup-row span:last-child { color:#55dfb9; }
+    @keyframes go-float { 0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-12px) rotate(-1deg)} }
+    @keyframes go-orbit { to{transform:rotate(360deg)} }
+    @media(max-width:760px) { .go-startup{padding:13px}.go-startup-card{min-height:calc(100vh - 26px);grid-template-columns:1fr;border-radius:23px}.go-startup-copy{padding:30px 25px 24px}.go-startup-brand{margin-bottom:36px}.go-startup h1{font-size:43px;letter-spacing:-1.8px}.go-startup-art{min-height:220px;padding:25px}.go-startup-orbit{width:210px}.go-startup-dashboard{max-width:300px;padding:17px}.go-startup-stat strong{font-size:24px}.go-startup-note{font-size:9px} }
+    @media(prefers-reduced-motion:reduce){.go-startup,.go-startup *{animation:none!important;transition:none!important}}
+  </style>
+
 </head>
 <body>
   <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -42,6 +89,29 @@
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
     <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10m-7 6h4"/></symbol>
   </svg>
+
+  <div class="go-startup" id="goStartup" role="dialog" aria-modal="true" aria-labelledby="goStartupTitle">
+    <div class="go-startup-card">
+      <section class="go-startup-copy">
+        <div class="go-startup-brand"><div class="go-startup-mark">✦</div><div><div class="go-startup-brandname">goal<span>OS</span></div><div class="go-startup-eyebrow" style="font-size:8px;letter-spacing:1.5px;margin-top:5px">YOUR PERSONAL HQ</div></div></div>
+        <div class="go-startup-eyebrow">YOUR 2026 COMMAND CENTER</div>
+        <h1 id="goStartupTitle">Make every goal count.</h1>
+        <p class="go-startup-lead">Your goals, finances, tasks and progress — together in one private workspace. Connect your Google account to open your saved GoalOS workspace.</p>
+        <div class="go-startup-state" id="goStartupState"><span class="go-startup-dot"></span><span id="goStartupStateText">Checking Google connection…</span></div>
+        <button class="go-startup-btn" id="goStartupAction" type="button"><span id="goStartupActionText">Connect Google</span><span aria-hidden="true">→</span></button>
+        <p class="go-startup-note" id="goStartupNote">Your spreadsheet stays private in your Google account. <strong>GoalOS never asks for your Google password.</strong> Sign-in is handled by Google.</p>
+      </section>
+      <aside class="go-startup-art" aria-hidden="true">
+        <div class="go-startup-orbit"></div>
+        <div class="go-startup-dashboard">
+          <div class="go-startup-dash-head"><span><i class="go-startup-mini-dot"></i> MY WORKSPACE</span><span>2026 ✦</span></div>
+          <div class="go-startup-stat"><small>FOCUS ON WHAT MATTERS</small><strong>One step at a time.</strong><div class="go-startup-bars"><div class="go-startup-bar"><span style="width:78%"></span></div><div class="go-startup-bar"><span style="width:54%"></span></div><div class="go-startup-bar"><span style="width:91%"></span></div></div></div>
+          <div class="go-startup-row"><span>Goals · Finance · Progress</span><span>✦ Private</span></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
   <div class="app-shell" id="shell">
     <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
       <div class="brand"><span class="brand-mark"><span class="brand-star">✦</span></span><div><div class="brand-name">goal<span>OS</span></div><div class="brand-caption">YOUR PERSONAL HQ</div></div></div>
@@ -73,5 +143,101 @@
   <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true"><div id="modalContent" class="modal-panel" role="dialog" aria-modal="true"></div></div>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
   <input type="file" id="privateImport" accept=".json,application/json" hidden />
+
+  <script>
+    function startGoalOSStartupGate() {
+    // Startup gate: always show the welcome screen, then choose the correct action from the saved Sheets state.
+    (function () {
+      const gate = document.getElementById('goStartup');
+      const statePill = document.getElementById('goStartupState');
+      const stateText = document.getElementById('goStartupStateText');
+      const action = document.getElementById('goStartupAction');
+      const actionText = document.getElementById('goStartupActionText');
+      const note = document.getElementById('goStartupNote');
+      if (!gate || !action) return;
+      document.body.classList.add('go-startup-open');
+      let mode = 'connect';
+      let busy = false;
+      function closeGate(goSettings) {
+        gate.classList.add('is-hidden');
+        document.body.classList.remove('go-startup-open');
+        setTimeout(() => { gate.hidden = true; }, 450);
+        if (goSettings) {
+          const settings = document.querySelector('.nav-item[data-page="settings"]');
+          if (settings) settings.click();
+        }
+      }
+      function paint() {
+        const api = window.GoalOSSheets;
+        const s = api && typeof api.getStatus === 'function' ? api.getStatus() : null;
+        const ready = !!(s && s.connected && s.sheetId);
+        const signedIn = !!(s && s.connected);
+        statePill.classList.toggle('is-connected', signedIn);
+        if (busy) {
+          stateText.textContent = 'Waiting for Google…';
+          actionText.textContent = 'Connecting…';
+          action.disabled = true;
+          mode = 'busy';
+          return;
+        }
+        action.disabled = false;
+        if (ready) {
+          stateText.textContent = 'Google connected · private Sheet linked';
+          actionText.textContent = 'Open my GoalOS workspace';
+          note.textContent = 'Your saved Google Sheet is linked. Open your workspace and continue where you left off.';
+          mode = 'open';
+        } else if (signedIn) {
+          stateText.textContent = 'Google connected · finish Sheet setup';
+          actionText.textContent = 'Continue to Google Sheets setup';
+          note.textContent = 'You are signed in. Create a private GoalOS spreadsheet or select the one you already use.';
+          mode = 'setup';
+        } else if (s && s.sheetId) {
+          stateText.textContent = 'Your Google Sheet is remembered · sign-in needed';
+          actionText.textContent = 'Reconnect Google';
+          note.textContent = 'Your spreadsheet selection is remembered. Sign in again to safely resume syncing.';
+          mode = 'connect';
+        } else {
+          stateText.textContent = 'Not connected to Google';
+          actionText.textContent = 'Connect Google to continue';
+          note.textContent = 'Connect your Google account to open your private workspace. Your spreadsheet stays in your Google account.';
+          mode = 'connect';
+        }
+      }
+      action.addEventListener('click', function () {
+        if (mode === 'open') { closeGate(false); return; }
+        if (mode === 'setup') { closeGate(true); return; }
+        if (mode === 'connect') {
+          if (!window.GoalOSSheets || typeof window.GoalOSSheets.handle !== 'function' || !window.google?.accounts?.oauth2) {
+            stateText.textContent = 'Google sign-in is still loading. Wait a moment, then try again.';
+            note.textContent = 'The Google sign-in service is loading. Your workspace is safe; please try the button again shortly.';
+            return;
+          }
+          busy = true; paint();
+          try { window.GoalOSSheets.handle('connect-sheets'); }
+          catch (_) { busy = false; stateText.textContent = 'Could not start Google sign-in. Please try again.'; paint(); }
+          // The Google popup is user-initiated. Poll only the local connection state; never auto-open a popup.
+          const started = Date.now();
+          const wait = setInterval(function () {
+            const s = window.GoalOSSheets?.getStatus?.();
+            if (s && s.connected) { clearInterval(wait); busy = false; paint(); }
+            else if (Date.now() - started > 45000) { clearInterval(wait); busy = false; paint(); stateText.textContent = 'Sign-in not completed. Please try again.'; }
+          }, 350);
+        }
+      });
+      paint();
+      // Refresh the welcome screen as the existing Sheets module restores its session on page load.
+      let ticks = 0;
+      const poll = setInterval(function () {
+        paint();
+        ticks += 1;
+        if (ticks > 80) clearInterval(poll);
+      }, 250);
+      window.addEventListener('pageshow', paint);
+    })();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startGoalOSStartupGate, { once: true });
+    else startGoalOSStartupGate();
+  </script>
+
 </body>
 </html>
