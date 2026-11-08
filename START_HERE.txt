@@ -1,0 +1,16 @@
+GoalOS 2026 — Google Sheets Sync Edition
+=====================================
+
+1. Extract this ZIP.
+2. Open SETUP_SHEETS.md for the complete guide.
+3. Enable the Google Sheets API in Google Cloud.
+4. Create a Web OAuth Client ID and authorize your GitHub Pages origin.
+5. Paste ONLY the public Client ID in site-config.js.
+6. Upload the extracted site files to GitHub; enable Pages.
+7. On your live website: Settings & Google Sheets > Connect Google > Create private Sheet.
+8. Import GoalOS_2026_Updated_Data.json from the separate download.
+9. Confirm the 'Saved to Sheets' indicator before closing the app.
+
+THE ZIP DOES NOT CONTAIN PRIVATE EXCEL OR JSON RECORDS.
+This version has NO Drive backup, NO Gmail reminders and NO Apps Script.
+Keep Google Sheet sharing Restricted and export an occasional JSON backup.

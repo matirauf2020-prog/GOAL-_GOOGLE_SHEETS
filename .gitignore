@@ -1,0 +1,12 @@
+# Sensitive data: NEVER publish these
+*PRIVATE*.json
+*private*.json
+*.xlsx
+*.xls
+.DS_Store
+GoalOS_Live_Data.json
+GoalOS_2026_Updated_Data.json
+GoalOS_Backup_*.json
+*secret*
+*SECRET*
+*.env
