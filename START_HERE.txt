@@ -1,16 +1,13 @@
-GoalOS 2026 — Google Sheets Sync Edition
-=====================================
+GoalOS 2026 — Stay Connected to Google Sheets
 
-1. Extract this ZIP.
-2. Open SETUP_SHEETS.md for the complete guide.
-3. Enable the Google Sheets API in Google Cloud.
-4. Create a Web OAuth Client ID and authorize your GitHub Pages origin.
-5. Paste ONLY the public Client ID in site-config.js.
-6. Upload the extracted site files to GitHub; enable Pages.
-7. On your live website: Settings & Google Sheets > Connect Google > Create private Sheet.
-8. Import GoalOS_2026_Updated_Data.json from the separate download.
-9. Confirm the 'Saved to Sheets' indicator before closing the app.
+1. Extract the ZIP.
+2. Upload ALL extracted files to the ROOT of your existing GitHub Pages repository.
+3. Wait for Pages deployment, then Ctrl + Shift + R on the live site.
+4. Open GoalOS Settings → Resume/Connect Google Sheets, then link your EXISTING Sheet if needed. DO NOT create another Sheet when you already have data in one.
+5. Check the status Saved to Sheets, then refresh the same tab to test persistence.
+6. To use a different phone or PC, choose Copy link for another device and authorize Google there once.
+7. Disconnect this device only when you choose.
 
-THE ZIP DOES NOT CONTAIN PRIVATE EXCEL OR JSON RECORDS.
-This version has NO Drive backup, NO Gmail reminders and NO Apps Script.
-Keep Google Sheet sharing Restricted and export an occasional JSON backup.
+Google's short-lived OAuth tokens cannot stay valid forever on a static website. If one expires, use Resume Google Sheets. No Google Drive backup, no Gmail reminders.
+
+More info: UPDATE_THIS_TIME.txt or SETUP_SHEETS.md

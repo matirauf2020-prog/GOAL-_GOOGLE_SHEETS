@@ -91,3 +91,15 @@ This also recovers your records after browser cache deletion: use the Sheet URL 
 3. Open Google Sheets and check the test row.
 4. Use **Load data from Sheet** on another browser or device and verify the test transaction is there.
 5. Keep an exported JSON copy as an emergency fallback.
+
+
+## Important: stay connected after refresh / use other devices
+
+1. Update **all website files** from this ZIP in GitHub (including `index.html`, `app.js`, `sheet-sync.js`, `site-config.js`, `sw.js`). GitHub Pages deploys them automatically.
+2. Open the live page, then press **Ctrl+Shift+R** once. If an old service worker persists, try a private window for diagnosis or clear this site's cached files (export your local JSON first — do not clear local data if it is not saved in Sheets).
+3. Under **Settings & Google Sheets**, click **Connect Google** once, select the Google account with access to your Sheet, and attach the existing Sheet if needed. Do NOT create a new Sheet if your data is already saved in one.
+4. Save your data and confirm it says **Saved to Sheets**. A refresh in the same tab now retains authorization until the token expires.
+5. For another device, open Settings and click **Copy link for another device**. Open the link in the other device and select **Connect/Resume Google Sheets**. Sign into the same Google account, then GoalOS should load the existing Sheet.
+6. The **Disconnect this device** button intentionally clears this tab's authorization and prevents automatic resume until you connect again. Your cloud data stays in the Sheet.
+
+**Google OAuth limits:** Google's browser token model requires a user action for a new access token and does not support silent background token refresh. Even this updated site cannot promise to keep the Google account authorized for weeks or after token expiry. The Sheet association, local unsaved data, and URL handoff persist; access may require a one-click Google authorization. Never paste your OAuth client secret into public website files. If a client secret has appeared in a shared screenshot or chat, rotate it in Google Cloud Console.

@@ -1,0 +1,14 @@
+GOALOS FIX — KEEP SHEETS CONNECTED ON REFRESH
+
+1. Extract GoalOS_Sheets_Stay_Connected.zip.
+2. On GitHub, upload all extracted files into your existing repository root (replace files).
+3. Visit your GitHub Pages URL and press Ctrl+Shift+R.
+4. Settings & Google Sheets > Resume / Connect Google. If your existing Sheet is missing, paste your existing Sheet URL and choose Use this Sheet. Do not create a new one.
+5. Save all data to Sheet; confirm Saved to Sheets.
+6. REFRESH the same tab: while the short-lived token is valid it now stays authorized and automatically checks your Sheet.
+7. Other device: Settings > Copy link for another device; open there and authorize Google once. It will load the same private Sheet when the account has access.
+8. Disconnect this device only when you want to stop auto-resume.
+
+NOTE: Google does not allow a GitHub Pages-only browser app to remain authorized forever with no user action. When Google's access token expires or after a browser session ends, use Resume Google Sheets. Data in the Sheet remains stored; a token expiring does not delete data.
+
+Do not upload private JSON or Google OAuth client secret to GitHub. If secret exposed, reset it in Google Cloud Console.

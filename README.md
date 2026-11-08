@@ -1,15 +1,15 @@
-# GoalOS 2026 — GitHub Pages + Google Sheets edition
+# GoalOS — Google Sheets Stay-Connected Edition
 
-Interactive private goal/finance/loan tracker. Deploy all files at the root of a GitHub Pages repository.
+GitHub Pages site. Upload the files **inside this folder** to your public GitHub repository root. There is no private JSON, Google client secret, Gmail, Drive backup, or reminder in this website package.
 
-- **Google Sheets is the cloud data store** (with readable tables + lossless hidden JSON snapshot).
-- **Local cache** works temporarily offline; pending edits sync after reconnect, subject to conflict checks.
-- **No Google Drive backup, no Gmail reminders, no Apps Script.**
-- Your original Excel converted JSON is **not included in this public website ZIP**.
-- See **SETUP_SHEETS.md** for deployment, Google Cloud OAuth, permissions, and troubleshooting.
+## New in this version
+- Refreshing the same browser tab restores your short-lived Google Sheets authorization from sessionStorage while valid (instead of dropping it on every refresh).
+- Google Sheet link, last confirmed save, and pending edits are remembered in localStorage, with clear sync status and conflict protection.
+- **Disconnect this device** explicitly clears the session and prevents automatic resume, without deleting Google Sheets data.
+- **Copy link for another device** shares a private, hash-fragment deep link that pre-selects the same Sheet. You must authorize with your own Google account on each device.
+- When Google's token expires, click **Resume Google Sheets**. It reuses prior consent where Google allows, but a Google popup is required for security.
 
-**First use:** Set OAuth Client ID in `site-config.js` → publish → Connect Google → Create private Sheet → Import your private JSON → Save all data to Sheet.
+## Important limitations
+A static GitHub Pages app cannot keep a Google OAuth token valid forever, silently renew an expired token, or automatically authorize a different browser/device. To do so securely without prompts would require a separately hosted backend and server-managed sessions. No tokens are stored in website files or localStorage; unexpired short-lived token lives only in sessionStorage in this tab.
 
-If you already have a Sheet from this version: Connect Google → Paste Sheet URL → Use this Sheet → Load data from Sheet.
-
-Important: Do not manually edit the readable Sheet tabs; edit in the GoalOS app so cloud state stays consistent. Your Sheet and account should remain private and active. Export JSON periodically for independent backup.
+First deployment: GitHub Pages, Google Sheets API, OAuth Web Client, OAuth test user or published app; then connect once and create or attach a Sheet. View SETUP_SHEETS.md for detailed instructions. Keep JSON backups periodically.

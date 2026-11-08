@@ -2,6 +2,8 @@
 (function () {
   'use strict';
   const CONFIG_KEY = 'goalos.sheet.connection.v1';
+  const SESSION_KEY = 'goalos.google.access.session.v1';
+  const SHEET_LINK_KEY = 'goalos-sheet';
   const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
   const API = 'https://sheets.googleapis.com/v4/spreadsheets';
   const STORE = 'GoalOS_State';
@@ -14,26 +16,61 @@
   let syncedHash = previous.syncedHash || '';
   let syncedAt = previous.syncedAt || '';
   let pending = Boolean(previous.pending);
-  let status = 'Connect Google to save to Sheets';
+  let manuallyDisconnected = Boolean(previous.manuallyDisconnected);
+  let status = manuallyDisconnected ? 'Disconnected by you. Cloud data remains safe in Google Sheets.' : 'Your Sheet is remembered. Resume Google access to synchronize.';
   let error = '';
   let conflict = false;
   let busy = false;
-  let token = '';
-  let expiresAt = 0;
+  // Short-lived Google access tokens are scoped to this browser tab's session,
+  // NEVER localStorage or GitHub files. sessionStorage survives a normal refresh.
+  const restoredSession = (() => {
+    if (manuallyDisconnected) return {};
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}'); } catch (_) { return {}; }
+  })();
+  let token = typeof restoredSession.token === 'string' && restoredSession.token.length > 10 ? restoredSession.token : '';
+  let expiresAt = Number(restoredSession.expiresAt) || 0;
+  if (Date.now() + 45000 >= expiresAt) { token = ''; expiresAt = 0; }
+
   let tokenClient = null;
   let timer = null;
   let helpers = null;
 
-  function connected() { return !!token && Date.now() + 45000 < expiresAt; }
-  function persistConnection() {
-    try { localStorage.setItem(CONFIG_KEY, JSON.stringify({sheetId,syncedRevision,syncedHash,syncedAt,pending})); } catch (_) { /* browser cache may be unavailable */ }
+  function connected() { return !manuallyDisconnected && !!token && Date.now() + 45000 < expiresAt; }
+  function persistSession() {
+    try {
+      if (connected()) sessionStorage.setItem(SESSION_KEY, JSON.stringify({token,expiresAt}));
+      else sessionStorage.removeItem(SESSION_KEY);
+    } catch (_) { /* private browsing may block storage; connect again next refresh */ }
   }
+  function persistConnection() {
+    try { localStorage.setItem(CONFIG_KEY, JSON.stringify({sheetId,syncedRevision,syncedHash,syncedAt,pending,manuallyDisconnected})); }
+    catch (_) { /* browser cache may be unavailable */ }
+  }
+  // Send this URL to another device you own. The Sheet itself remains access-controlled by Google.
+  function shareUrl() {
+    if (!sheetId || typeof location === 'undefined') return '';
+    return location.origin + location.pathname + '#' + SHEET_LINK_KEY + '=' + encodeURIComponent(sheetId);
+  }
+  function extractId(value) {
+    const text=String(value||'').trim();
+    const m=text.match(/\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
+    const id=m?m[1]:text;
+    return /^[A-Za-z0-9_-]{20,}$/.test(id)?id:'';
+  }
+  function readSheetHash() {
+    try { return extractId(new URLSearchParams(location.hash.replace(/^#/, '')).get(SHEET_LINK_KEY) || ''); }
+    catch (_) { return ''; }
+  }
+  // A private, shareable bookmark lets a NEW device pre-select the Sheet, not bypass Google sign-in.
+  const fromHash = readSheetHash();
+  if (fromHash && !sheetId && !manuallyDisconnected) { sheetId=fromHash;persistConnection(); }
+
   function alertUser(message) { if (helpers && helpers.toast) helpers.toast(message); }
   function renderStatus() {
     const chip = document.getElementById('cloudChip');
     if (chip) {
       const warning = !connected() || pending || conflict || !!error;
-      chip.textContent = conflict ? 'Sync conflict' : error ? 'Sync error' : !connected() ? 'Google disconnected' : !sheetId ? 'Choose a Sheet' : busy ? 'Saving…' : pending ? 'Unsaved changes' : 'Saved to Sheets';
+      chip.textContent = conflict ? 'Sync conflict' : error ? 'Sync error' : manuallyDisconnected ? 'Disconnected by you' : !connected() ? (sheetId ? 'Sheet remembered · Reauthorize' : 'Connect Google Sheets') : !sheetId ? 'Choose a Sheet' : busy ? 'Saving…' : pending ? 'Unsaved changes' : 'Saved to Sheets';
       chip.className = 'cloud-chip ' + (conflict || error ? 'error' : warning ? 'waiting' : 'saved');
       chip.title = status;
     }
@@ -75,7 +112,7 @@
     let data = {};
     try { data = content ? JSON.parse(content) : {}; } catch (_) { data = {message:content}; }
     if (!response.ok) {
-      if (response.status === 401) { token=''; expiresAt=0; }
+      if (response.status === 401) { token=''; expiresAt=0; persistSession(); status='Google authorization expired. Resume access to your remembered Sheet.'; }
       let reason = data?.error?.message || data?.message || ('Google Sheets returned '+response.status);
       throw Error(reason);
     }
@@ -115,6 +152,7 @@
   }
   function linked(newId) {
     if(newId!==sheetId){sheetId=newId;syncedRevision='';syncedHash='';syncedAt='';pending=Boolean(jsonData());}
+    manuallyDisconnected=false;
     conflict=false;error='';persistConnection();renderStatus();
   }
   async function checkConnectedSheet() {
@@ -216,18 +254,20 @@
   }
   function connect() {
     const id=String(window.GOALOS_GOOGLE_CLIENT_ID||'').trim();
-    if(!id || !/\.apps\.googleusercontent\.com$/.test(id)) {alertUser('First paste your Google OAuth Web Client ID into site-config.js. See SETUP_SHEETS.md.');return;}
+    if(!id || !/\.apps\.googleusercontent\.com$/.test(id)) {alertUser('OAuth Client ID is not loaded. Re-deploy index.html and site-config.js, then hard-refresh the LIVE GitHub Pages URL. Check your Pages branch/folder.');return;}
     if(!window.google?.accounts?.oauth2){alertUser('Google authorization script is unavailable. Open the GitHub Pages website over HTTPS and allow popups.');return;}
     if(!tokenClient){
       tokenClient=google.accounts.oauth2.initTokenClient({client_id:id,scope:SCOPE,callback:async result=>{
         if(!result?.access_token || result.error){alertUser('Google did not authorize the Sheets connection.');return;}
         if(!String(result.scope||'').split(' ').includes(SCOPE)){alertUser('Sheets permission was not granted.');return;}
         token=result.access_token;expiresAt=Date.now()+(Math.max(60,Number(result.expires_in)||3600)*1000);
-        status='Google connected.';error='';renderStatus();
+        manuallyDisconnected=false;
+        persistSession();persistConnection();
+        status='Google access resumed. Syncing your remembered Sheet…';error='';renderStatus();
         try{await checkConnectedSheet();}catch(e){error=e.message;status='Cannot access Sheet: '+e.message;renderStatus();alertUser(status);}
       },error_callback:()=>alertUser('Google popup was blocked or closed. Please try again.')});
     }
-    tokenClient.requestAccessToken({prompt:'consent'});
+    tokenClient.requestAccessToken({prompt:''}); // Consent is shown by Google only when needed.
   }
   async function createNew(){
     if(!connected()){alertUser('Connect Google first.');return;}
@@ -245,12 +285,6 @@
     finally{busy=false;renderStatus();}
     if(sheetId && connected() && jsonData())await saveNow();
   }
-  function extractId(value) {
-    const text=String(value||'').trim();
-    const m=text.match(/\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
-    const id=m?m[1]:text;
-    return /^[A-Za-z0-9_-]{20,}$/.test(id)?id:'';
-  }
   async function useExisting(){
     if(!connected()){alertUser('Connect Google first.');return;}
     const newId=extractId(document.getElementById('sheetUrlInput')?.value || '');
@@ -266,32 +300,51 @@
     if(action==='save-sheet')return saveNow(true);
     if(action==='load-sheet')return loadNow(true);
     if(action==='disconnect-sheets'){
-      clearTimeout(timer);token='';expiresAt=0;error='';conflict=false;
-      status='Google disconnected. Your Sheet remains saved online; new edits stay only in this browser until you reconnect.';
-      renderStatus();alertUser('Google disconnected. Cloud data was not deleted.');
+      clearTimeout(timer);
+      token='';expiresAt=0;error='';conflict=false;
+      manuallyDisconnected=true;persistSession();persistConnection();
+      status='Disconnected by you. Your Google Sheet and data were not deleted. Auto-resume is off until you connect again.';
+      renderStatus();alertUser('Disconnected on this device. Your private Google Sheet is unchanged.');
+    }
+    if(action==='copy-device-link'){
+      const link=shareUrl();
+      if(!link){alertUser('Create or attach a Sheet first.');return;}
+      try { await navigator.clipboard.writeText(link); alertUser('Copied your private Sheet workspace link. Open it on your other device, then authorize Google once.'); }
+      catch (_) { window.prompt('Copy this link to your other device:',link); }
     }
   }
   function html(){
     const isOn=connected();
     const link=sheetId?'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(sheetId)+'/edit':'';
+    const authLabel = isOn ? 'Renew Google access' : manuallyDisconnected ? 'Connect Google again' : sheetId ? 'Resume Google Sheets' : 'Connect Google';
+    const sheetNote = manuallyDisconnected ? 'Disconnected by you. Auto-resume is disabled.' : isOn ? 'Authorized for this browser session.' : sheetId ? 'Your Sheet is remembered; Google authorization is needed to sync.' : 'Connect to Google and choose your Sheet.';
     return `<div class="sheet-controls">
-      <div class="google-status"><span class="google-indicator ${isOn?'online':'offline'}"></span><strong>${esc(isOn?'Google connected':'Not connected to Google')}</strong></div>
+      <div class="google-status"><span class="google-indicator ${isOn?'online':'offline'}"></span><strong>${esc(isOn?'Google connected':sheetId&&!manuallyDisconnected?'Google Sheet remembered':manuallyDisconnected?'Disconnected by you':'Not connected to Google')}</strong></div>
+      <p class="field-help">${esc(sheetNote)} Refreshing this page will retain a still-valid access token in this tab. Once Google authorization expires or you open another device, click Resume/Connect again.</p>
       <p class="field-help sheets-help">${esc(status)}<br>Last successful cloud save: <strong>${esc(shortDate(syncedAt))}</strong>. ${pending?'<strong>Some local edits are not yet confirmed in Sheets.</strong>':' '}</p>
       <div class="settings-actions google-buttons">
-        <button class="btn btn-primary" type="button" data-action="connect-sheets">${isOn?'Reconnect Google':'Connect Google'}</button>
+        <button class="btn btn-primary" type="button" data-action="connect-sheets">${esc(authLabel)}</button>
         <button class="btn btn-neutral" type="button" data-action="create-sheet" ${!isOn?'disabled':''}>Create private Sheet</button>
-        ${isOn?'<button class="btn btn-neutral" type="button" data-action="disconnect-sheets">Disconnect</button>':''}
+        ${(isOn||sheetId||manuallyDisconnected)?'<button class="btn btn-neutral" type="button" data-action="disconnect-sheets">Disconnect this device</button>':''}
       </div>
       <div class="sheet-url-row"><div class="form-field"><label for="sheetUrlInput">Existing GoalOS Google Sheet link or ID</label><input id="sheetUrlInput" type="text" placeholder="https://docs.google.com/spreadsheets/d/.../edit" autocomplete="off" /></div><button class="btn btn-neutral" type="button" data-action="link-sheet" ${!isOn?'disabled':''}>Use this Sheet</button></div>
-      ${link?`<p class="field-help">Your linked spreadsheet: <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Open my private Google Sheet ↗</a></p>`:''}
+      ${link?`<p class="field-help">Your linked spreadsheet: <a href="${esc(link)}" target="_blank" rel="noopener noreferrer">Open my private Google Sheet ↗</a></p><div class="settings-actions google-buttons"><button class="btn btn-neutral" type="button" data-action="copy-device-link">Copy link for another device</button></div><p class="field-help">Open that link on your other device and authorize Google with the account that can access this Sheet. Do not post this link publicly.</p>`:''}
       <div class="settings-actions google-buttons">
         <button class="btn btn-primary" type="button" data-action="save-sheet" ${!isOn||!sheetId?'disabled':''}>Save all data to Sheet</button>
         <button class="btn btn-neutral" type="button" data-action="load-sheet" ${!isOn||!sheetId?'disabled':''}>Load data from Sheet</button>
       </div>
       ${conflict?'<div class="notice unsafe"><strong>Sync conflict:</strong> Cloud and browser both have different records. Use Load data from Sheet to keep the cloud copy, or Save all data to Sheet to overwrite it after confirmation.</div>':''}
       <div class="notice private"><strong>How it works:</strong> Your complete data is stored in the private Sheet (two protected snapshot slots) and readable Transactions, Goals, Loans, Settings and Workbook_Archive tabs. Edits save automatically about one second after changes while Google is connected. If disconnected, edits remain locally and upload after reconnect, unless a conflict requires your choice. No Gmail or Drive API access is used.</div>
-      <p class="field-help"><strong>Important:</strong> Reconnect Google after restarting the website or when Google authorization expires. Do not edit GoalOS in two devices at the same time. A Google Sheet is long-term storage, not a guarantee against deletion or account loss. <a href="SETUP_SHEETS.md" target="_blank" rel="noopener noreferrer">Open setup guide ↗</a></p>
+      <p class="field-help"><strong>Important:</strong> A page refresh in the same tab preserves unexpired access. Google still requires fresh authorization when a token expires or on another device; a public GitHub Pages app cannot bypass this. Do not edit GoalOS in two devices at the same time. A Google Sheet is long-term storage, not a guarantee against deletion or account loss. <a href="SETUP_SHEETS.md" target="_blank" rel="noopener noreferrer">Open setup guide ↗</a></p>
     </div>`;
   }
-  window.GoalOSSheets={init(api){helpers=api;renderStatus();},changed,handle,html,getStatus:()=>({sheetId,connected:connected(),pending,conflict,error,syncedRevision,syncedAt}),_testing:{hashString,chunks,viewData,extractId}};
+  window.GoalOSSheets={init(api){
+    helpers=api;
+    persistSession();renderStatus();
+    // A normal reload can resume automatically while its SESSION token remains valid.
+    // No new OAuth popups are opened without the user's click.
+    if(connected() && sheetId)checkConnectedSheet().catch(e=>{
+      error=e.message;status='Cannot resume Sheet sync: '+e.message;renderStatus();
+    });
+  },changed,handle,html,getStatus:()=>({sheetId,connected:connected(),pending,conflict,error,syncedRevision,syncedAt,manuallyDisconnected,shareUrl:shareUrl()}),_testing:{hashString,chunks,viewData,extractId}};
 })();

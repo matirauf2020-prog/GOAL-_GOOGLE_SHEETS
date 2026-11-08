@@ -10,9 +10,11 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="site-config.js" defer></script>
-  <script src="sheet-sync.js" defer></script>
-  <script src="app.js" defer></script>
+  <!-- Backup public client ID prevents stale or missing site-config.js from blocking sign-in. -->
+  <script>window.GOALOS_GOOGLE_CLIENT_ID = '742709884845-i6ikkp6eni62vdvtqb00upra29kj3n0a.apps.googleusercontent.com';</script>
+  <script src="site-config.js?v=20261108-stayconnected-v1" defer></script>
+  <script src="sheet-sync.js?v=20261108-stayconnected-v1" defer></script>
+  <script src="app.js?v=20261108-stayconnected-v1" defer></script>
 </head>
 <body>
   <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
