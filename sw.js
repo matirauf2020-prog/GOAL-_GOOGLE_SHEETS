@@ -1,8 +1,8 @@
-const VERSION='20261108-cloudrestore-v2';
+const VERSION='20261109-receipts-v1';
 const CACHE='goalos-shell-'+VERSION;
 const FILES=[
   './','./index.html','./styles.css?v='+VERSION,'./app.js?v='+VERSION,
-  './sheet-sync.js?v='+VERSION,'./site-config.js?v='+VERSION,
+  './sheet-sync.js?v='+VERSION,'./site-config.js?v='+VERSION,'./receipt.js',
   './SETUP_SHEETS.md','./icon.svg','./manifest.webmanifest'
 ];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));self.skipWaiting();});
