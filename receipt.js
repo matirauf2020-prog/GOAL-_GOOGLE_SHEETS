@@ -3,85 +3,28 @@
   'use strict';
   const STORAGE_KEY = 'goalos.v1.userdata';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const localDate = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  };
-  const dateLabel = value => {
-    if (!value) return '—';
-    const d = new Date(`${String(value).slice(0,10)}T12:00:00`);
-    return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
-  };
-  const amount = (value, currency) => {
-    const number = Number(value) || 0;
-    try { return new Intl.NumberFormat(undefined,{style:'currency',currency: /^[A-Z]{3}$/.test(currency) ? currency : 'PKR',maximumFractionDigits:2}).format(number); }
-    catch (_) { return `${currency || 'PKR'} ${number.toLocaleString(undefined,{maximumFractionDigits:2})}`; }
-  };
-  function readWorkspace() {
-    try {
-      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (!data || !Array.isArray(data.transactions)) throw new Error('No workspace data is available in this browser. Open your GoalOS workspace and load your data first.');
-      return data;
-    } catch (error) {
-      throw new Error(error.message || 'Could not read the GoalOS workspace in this browser.');
-    }
-  }
-  function receiptHtml(data, start, end) {
-    const currency = String(data.settings?.currency || 'PKR');
-    const transactions = data.transactions
-      .filter(row => { const date = String(row.date || '').slice(0,10); return date && date >= start && date <= end; })
-      .sort((a,b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.id || '').localeCompare(String(b.id || '')));
-    const credits = transactions.filter(row => row.type === 'Credit').reduce((sum,row) => sum + (Number(row.amount)||0),0);
-    const debits = transactions.filter(row => row.type === 'Debit').reduce((sum,row) => sum + (Number(row.amount)||0),0);
-    const currentBalance = (Number(data.settings?.openingBalance)||0) + data.transactions.reduce((sum,row) => sum + (row.type === 'Credit' ? (Number(row.amount)||0) : row.type === 'Debit' ? -(Number(row.amount)||0) : 0),0);
-    const categories = new Map();
-    transactions.filter(row => row.type === 'Debit').forEach(row => {
-      const name = String(row.category || 'Other');
-      categories.set(name,(categories.get(name)||0)+(Number(row.amount)||0));
-    });
-    const categoryRows = [...categories.entries()].sort((a,b) => b[1]-a[1]).map(([name,total]) => `<tr><td>${esc(name)}</td><td class="money">${esc(amount(total,currency))}</td></tr>`).join('');
-    const transactionRows = transactions.map(row => {
-      const isCredit = row.type === 'Credit';
-      const sign = isCredit ? '+' : row.type === 'Debit' ? '−' : '';
-      return `<tr><td>${esc(dateLabel(row.date))}</td><td><span class="type ${isCredit?'credit':row.type==='Debit'?'debit':''}">${esc(row.type || 'Transaction')}</span></td><td>${esc(row.description || row.category || '—')}${row.notes ? `<small class="note">${esc(row.notes)}</small>` : ''}</td><td>${esc(row.account || row.fromAccount || '—')}</td><td class="money ${isCredit?'positive':row.type==='Debit'?'negative':''}">${sign}${esc(amount(row.amount,currency))}</td></tr>`;
-    }).join('');
-    const range = start === end ? dateLabel(start) : `${dateLabel(start)} – ${dateLabel(end)}`;
+  const localDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const dateLabel = value => { if (!value) return '—'; const d = new Date(`${String(value).slice(0,10)}T12:00:00`); return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}); };
+  const amount = (value, currency) => { const number=Number(value)||0; try{return new Intl.NumberFormat(undefined,{style:'currency',currency:/^[A-Z]{3}$/.test(currency)?currency:'PKR',maximumFractionDigits:2}).format(number);}catch(_){return `${currency||'PKR'} ${number.toLocaleString(undefined,{maximumFractionDigits:2})}`;} };
+  function readWorkspace(){try{const data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');if(!data||!Array.isArray(data.transactions))throw new Error('No workspace data is available in this browser. Open your GoalOS workspace and load your data first.');return data;}catch(error){throw new Error(error.message||'Could not read the GoalOS workspace in this browser.');}}
+  function receiptHtml(data,start,end){
+    const currency=String(data.settings?.currency||'PKR');
+    const transactions=data.transactions.filter(row=>{const date=String(row.date||'').slice(0,10);return date&&date>=start&&date<=end;}).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||'')));
+    const credits=transactions.filter(row=>row.type==='Credit').reduce((sum,row)=>sum+(Number(row.amount)||0),0);
+    const debits=transactions.filter(row=>row.type==='Debit').reduce((sum,row)=>sum+(Number(row.amount)||0),0);
+    const currentBalance=(Number(data.settings?.openingBalance)||0)+data.transactions.reduce((sum,row)=>sum+(row.type==='Credit'?(Number(row.amount)||0):row.type==='Debit'?-(Number(row.amount)||0):0),0);
+    const categories=new Map();
+    transactions.filter(row=>row.type==='Debit').forEach(row=>{const name=String(row.category||'Other');categories.set(name,(categories.get(name)||0)+(Number(row.amount)||0));});
+    // Show spending as a negative effect so category totals reconcile with the net amount.
+    const categoryRows=[...categories.entries()].sort((a,b)=>b[1]-a[1]).map(([name,total])=>`<tr><td>${esc(name)}</td><td class="money negative">−${esc(amount(total,currency))}</td></tr>`).join('');
+    const transactionRows=transactions.map(row=>{const isCredit=row.type==='Credit',isDebit=row.type==='Debit';const sign=isCredit?'+':isDebit?'−':'';return `<tr><td>${esc(dateLabel(row.date))}</td><td><span class="type ${isCredit?'credit':isDebit?'debit':''}">${esc(row.type||'Transaction')}</span></td><td>${esc(row.description||row.category||'—')}${row.notes?`<small class="note">${esc(row.notes)}</small>`:''}</td><td>${esc(row.account||row.fromAccount||'—')}</td><td class="money ${isCredit?'positive':isDebit?'negative':''}">${sign}${esc(amount(row.amount,currency))}</td></tr>`;}).join('');
+    const range=start===end?dateLabel(start):`${dateLabel(start)} – ${dateLabel(end)}`;
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GoalOS receipt ${esc(start)}${start===end?'':'-'+esc(end)}</title><style>
       *{box-sizing:border-box}body{margin:0;background:#f3f5fa;color:#19243a;font:14px/1.5 Arial,Helvetica,sans-serif}.receipt{width:min(920px,calc(100% - 32px));margin:32px auto;background:#fff;padding:42px 48px;border:1px solid #e6eaf1;border-radius:16px;box-shadow:0 12px 40px #18284812}.brand{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #6858df;padding-bottom:22px}.brand h1{font-size:28px;letter-spacing:-.7px;margin:0;color:#242c45}.brand p{margin:4px 0 0;color:#71809a}.label{text-transform:uppercase;letter-spacing:1.4px;font-size:10px;font-weight:700;color:#6858df}.range{text-align:right;font-size:16px;font-weight:700}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0}.stat{padding:15px 16px;border:1px solid #e9edf4;border-radius:10px;background:#fafbfe}.stat span{display:block;color:#738099;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}.stat strong{display:block;margin-top:7px;font-size:17px;overflow-wrap:anywhere}.positive{color:#168362}.negative{color:#bd4354}.section{margin-top:27px}.section h2{font-size:15px;margin:0 0 10px}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;color:#738099;font-size:10px;text-transform:uppercase;letter-spacing:.55px;background:#f7f8fc}th,td{padding:10px 9px;border-bottom:1px solid #edf0f5;vertical-align:top}td.money,th.money{text-align:right;white-space:nowrap}.type{display:inline-block;padding:3px 7px;border-radius:20px;background:#eef1f7;color:#526078;font-size:10px;font-weight:700}.type.credit{background:#e5f7ef;color:#168362}.type.debit{background:#fff0f1;color:#bd4354}.note{display:block;color:#7a879b;margin-top:3px}.empty{padding:20px;text-align:center;border:1px dashed #cfd6e3;border-radius:9px;color:#71809a}.footer{margin-top:26px;padding-top:14px;border-top:1px solid #edf0f5;color:#8290a4;font-size:10px;display:flex;justify-content:space-between;gap:12px}.toolbar{width:min(920px,calc(100% - 32px));margin:20px auto 0;display:flex;justify-content:flex-end;gap:9px}.toolbar button{border:0;border-radius:8px;padding:11px 15px;background:#6858df;color:#fff;font-weight:700;cursor:pointer}.toolbar button.secondary{background:#e9ecf4;color:#34405a}@media(max-width:650px){.receipt{padding:25px 18px;margin:16px auto}.summary{grid-template-columns:repeat(2,1fr)}.brand{gap:12px}.brand h1{font-size:23px}}@media print{@page{size:A4;margin:14mm}body{background:#fff;font-size:11px}.receipt{width:100%;margin:0;padding:0;border:0;border-radius:0;box-shadow:none}.toolbar{display:none}.summary{gap:8px;margin:18px 0}.stat{padding:10px}.section{break-inside:avoid}.section h2{break-after:avoid}.footer{margin-top:18px}thead{display:table-header-group}tr{break-inside:avoid}}
-      </style></head><body><div class="toolbar"><button class="secondary" onclick="window.close()">Close</button><button onclick="window.print()">Print / Save as PDF</button></div><main class="receipt"><header class="brand"><div><div class="label">Personal finance receipt</div><h1>GoalOS</h1><p>Transaction summary</p></div><div class="range"><div class="label">Report period</div>${esc(range)}</div></header><section class="summary"><div class="stat"><span>Transactions</span><strong>${transactions.length}</strong></div><div class="stat"><span>Total income</span><strong class="positive">${esc(amount(credits,currency))}</strong></div><div class="stat"><span>Total expenses</span><strong class="negative">${esc(amount(debits,currency))}</strong></div><div class="stat"><span>Period net</span><strong class="${credits-debits>=0?'positive':'negative'}">${esc(amount(credits-debits,currency))}</strong></div></section><section class="section"><h2>Transactions</h2>${transactions.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Account</th><th class="money">Amount</th></tr></thead><tbody>${transactionRows}</tbody></table></div>`:'<div class="empty">No transactions were recorded for this period.</div>'}</section>${categories.size?`<section class="section"><h2>Spending by category</h2><table><thead><tr><th>Category</th><th class="money">Total spent</th></tr></thead><tbody>${categoryRows}</tbody></table></section>`:''}<section class="section"><h2>Workspace balance</h2><table><tbody><tr><td>Current balance across all recorded transactions</td><td class="money"><strong>${esc(amount(currentBalance,currency))}</strong></td></tr></tbody></table></section><footer class="footer"><span>Generated from the data saved in this GoalOS browser workspace.</span><span>${esc(new Date().toLocaleString())}</span></footer></main><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script></body></html>`;
+      </style></head><body><div class="toolbar"><button class="secondary" onclick="window.close()">Close</button><button onclick="window.print()">Print / Save as PDF</button></div><main class="receipt"><header class="brand"><div><div class="label">Personal finance receipt</div><h1>GoalOS</h1><p>Transaction summary</p></div><div class="range"><div class="label">Report period</div>${esc(range)}</div></header><section class="summary"><div class="stat"><span>Transactions</span><strong>${transactions.length}</strong></div><div class="stat"><span>Total income</span><strong class="positive">+${esc(amount(credits,currency))}</strong></div><div class="stat"><span>Total expenses</span><strong class="negative">−${esc(amount(debits,currency))}</strong></div><div class="stat"><span>Period net</span><strong class="${credits-debits>=0?'positive':'negative'}">${credits-debits>0?'+':credits-debits<0?'−':''}${esc(amount(Math.abs(credits-debits),currency))}</strong></div></section><section class="section"><h2>Transactions · signed net effect</h2>${transactions.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Account</th><th class="money">Amount / net effect</th></tr></thead><tbody>${transactionRows}</tbody></table></div>`:'<div class="empty">No transactions were recorded for this period.</div>'}</section>${categories.size?`<section class="section"><h2>Spending by category · effect on net</h2><table><thead><tr><th>Category</th><th class="money">Net effect</th></tr></thead><tbody>${categoryRows}</tbody></table></section>`:''}<section class="section"><h2>Workspace balance</h2><table><tbody><tr><td>Current balance across all recorded transactions</td><td class="money"><strong>${esc(amount(currentBalance,currency))}</strong></td></tr></tbody></table></section><footer class="footer"><span>Generated from the data saved in this GoalOS browser workspace.</span><span>${esc(new Date().toLocaleString())}</span></footer></main><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300));</script></body></html>`;
   }
-  function makeReceipt(start,end) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) throw new Error('Choose a valid date range (start date must not be after end date).');
-    const report = receiptHtml(readWorkspace(),start,end);
-    const win = window.open('', '_blank');
-    if (!win) throw new Error('Your browser blocked the receipt window. Allow pop-ups for this GoalOS site and try again.');
-    win.document.open(); win.document.write(report); win.document.close();
-  }
-  function installControls() {
-    const root = document.getElementById('app');
-    if (!root) return;
-    const title = root.querySelector('.page-title');
-    const pageHead = root.querySelector('.page-head');
-    if (!title || title.textContent.trim() !== 'Transactions' || !pageHead || root.querySelector('.goalos-receipt-tools')) return;
-    const box = document.createElement('section');
-    box.className = 'goalos-receipt-tools';
-    box.innerHTML = `<style>.goalos-receipt-tools{margin:0 0 18px;padding:18px 20px;background:var(--surface,#fff);border:1px solid var(--line,#e9edf5);border-radius:14px;box-shadow:0 5px 18px rgba(27,39,70,.04)}.goalos-receipt-tools h2{font-size:15px;margin:0 0 4px;color:var(--ink,#17213b)}.goalos-receipt-tools p{font-size:12px;color:var(--muted,#8090ab);margin:0 0 13px}.goalos-receipt-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.goalos-receipt-controls label{display:grid;gap:5px;font-weight:650;font-size:11px;color:var(--muted,#8090ab)}.goalos-receipt-controls input{height:39px;padding:0 10px;border:1px solid var(--line,#e9edf5);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#17213b);font:inherit}.goalos-receipt-controls button{min-height:39px;padding:0 14px;border:0;border-radius:8px;background:var(--violet,#6555e8);color:#fff;font:700 12px inherit;cursor:pointer}.goalos-receipt-controls button:hover{filter:brightness(1.08)}@media(max-width:600px){.goalos-receipt-controls label{flex:1 1 130px}.goalos-receipt-controls button{flex:1 1 100%}}</style><h2>Download a transaction receipt</h2><p>Choose today for a daily receipt or set a custom date range. Use “Save as PDF” in the print dialog to download a PDF.</p><div class="goalos-receipt-controls"><label>From date<input type="date" data-receipt-from></label><label>To date<input type="date" data-receipt-to></label><button type="button" data-receipt-today>Today's receipt</button><button type="button" data-receipt-range>Print / Save date-range receipt</button></div>`;
-    pageHead.insertAdjacentElement('afterend',box);
-    box.querySelector('[data-receipt-from]').value = localDate();
-    box.querySelector('[data-receipt-to]').value = localDate();
-  }
-  document.addEventListener('click',event => {
-    const todayButton = event.target.closest('[data-receipt-today]');
-    const rangeButton = event.target.closest('[data-receipt-range]');
-    if (!todayButton && !rangeButton) return;
-    event.preventDefault();
-    const box = event.target.closest('.goalos-receipt-tools');
-    try {
-      if (todayButton) makeReceipt(localDate(),localDate());
-      else makeReceipt(box.querySelector('[data-receipt-from]').value,box.querySelector('[data-receipt-to]').value);
-    } catch (error) { window.alert(error.message || 'Could not create the receipt.'); }
-  });
-  const app = document.getElementById('app');
-  if (app) new MutationObserver(installControls).observe(app,{childList:true,subtree:true});
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',installControls); else installControls();
+  function makeReceipt(start,end){if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(end)||start>end)throw new Error('Choose a valid date range (start date must not be after end date).');const report=receiptHtml(readWorkspace(),start,end);const win=window.open('','_blank');if(!win)throw new Error('Your browser blocked the receipt window. Allow pop-ups for this GoalOS site and try again.');win.document.open();win.document.write(report);win.document.close();}
+  function installControls(){const root=document.getElementById('app');if(!root)return;const title=root.querySelector('.page-title'),pageHead=root.querySelector('.page-head');if(!title||title.textContent.trim()!=='Transactions'||!pageHead||root.querySelector('.goalos-receipt-tools'))return;const box=document.createElement('section');box.className='goalos-receipt-tools';box.innerHTML=`<style>.goalos-receipt-tools{margin:0 0 18px;padding:18px 20px;background:var(--surface,#fff);border:1px solid var(--line,#e9edf5);border-radius:14px;box-shadow:0 5px 18px rgba(27,39,70,.04)}.goalos-receipt-tools h2{font-size:15px;margin:0 0 4px;color:var(--ink,#17213b)}.goalos-receipt-tools p{font-size:12px;color:var(--muted,#8090ab);margin:0 0 13px}.goalos-receipt-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.goalos-receipt-controls label{display:grid;gap:5px;font-weight:650;font-size:11px;color:var(--muted,#8090ab)}.goalos-receipt-controls input{height:39px;padding:0 10px;border:1px solid var(--line,#e9edf5);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#17213b);font:inherit}.goalos-receipt-controls button{min-height:39px;padding:0 14px;border:0;border-radius:8px;background:var(--violet,#6555e8);color:#fff;font:700 12px inherit;cursor:pointer}.goalos-receipt-controls button:hover{filter:brightness(1.08)}@media(max-width:600px){.goalos-receipt-controls label{flex:1 1 130px}.goalos-receipt-controls button{flex:1 1 100%}}</style><h2>Download a transaction receipt</h2><p>Choose today for a daily receipt or set a custom date range. Use “Save as PDF” in the print dialog to download a PDF.</p><div class="goalos-receipt-controls"><label>From date<input type="date" data-receipt-from></label><label>To date<input type="date" data-receipt-to></label><button type="button" data-receipt-today>Today's receipt</button><button type="button" data-receipt-range>Print / Save date-range receipt</button></div>`;pageHead.insertAdjacentElement('afterend',box);box.querySelector('[data-receipt-from]').value=localDate();box.querySelector('[data-receipt-to]').value=localDate();}
+  document.addEventListener('click',event=>{const todayButton=event.target.closest('[data-receipt-today]'),rangeButton=event.target.closest('[data-receipt-range]');if(!todayButton&&!rangeButton)return;event.preventDefault();const box=event.target.closest('.goalos-receipt-tools');try{if(todayButton)makeReceipt(localDate(),localDate());else makeReceipt(box.querySelector('[data-receipt-from]').value,box.querySelector('[data-receipt-to]').value);}catch(error){window.alert(error.message||'Could not create the receipt.');}});
+  const app=document.getElementById('app');if(app)new MutationObserver(installControls).observe(app,{childList:true,subtree:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installControls);else installControls();
 })();
